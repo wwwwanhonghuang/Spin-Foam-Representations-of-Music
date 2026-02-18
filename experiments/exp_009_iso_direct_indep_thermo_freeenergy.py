@@ -1,6 +1,6 @@
 """
-exp_06_iso_direct_indep_thermo_vonneumann.py
-Experiment for scheme 06: Iso-Direct-Indep + Thermo-Entropy-vonNeumann
+exp_009_iso_direct_indep_thermo_freeenergy.py
+Experiment for scheme 09: Iso-Direct-Indep + Thermo-FreeEnergy
 """
 
 from __future__ import annotations
@@ -9,14 +9,14 @@ import numpy as np
 
 from music.midi.midi_entity import MIDIEntity
 from core.compilation.components.spinfoam import SpinfoamComplex
-from core.compilation.schemes.s_006_iso_direct_indep_thermo_vonneumann import IsoDirectIndepThermoVonNeumann
+from core.compilation.schemes.s_009_iso_direct_indep_thermo_freeenergy import IsoDirectIndepThermoFreeEnergy
 
-SCHEME_TITLE = "Iso-Direct-Indep + Thermo-Entropy-vonNeumann"
-SCHEME_IDX   = 6
+SCHEME_TITLE = "Iso-Direct-Indep + Thermo-FreeEnergy"
+SCHEME_IDX   = 9
 
 
 def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
-    """Run experiment 06: Iso-Direct-Indep + Thermo-Entropy-vonNeumann"""
+    """Run experiment 09: Iso-Direct-Indep + Thermo-FreeEnergy"""
 
     if midi_path and os.path.exists(midi_path):
         midi = MIDIEntity.from_file(midi_path)
@@ -26,7 +26,7 @@ def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
             pr[pitch - 21, :] = 1.0
         midi = MIDIEntity.from_piano_roll(pr)
 
-    scheme = IsoDirectIndepThermoVonNeumann()
+    scheme = IsoDirectIndepThermoFreeEnergy()
     sf = scheme.compile_to_spinfoam(midi)
     return sf
 

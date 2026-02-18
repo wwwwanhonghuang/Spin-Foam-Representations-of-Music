@@ -1,6 +1,6 @@
 """
-exp_13_iso_direct_indep_geom_volume.py
-Experiment for scheme 13: Iso-Direct-Indep + Geom-VolumeOperator
+exp_002_iso_direct_indep_topo_face.py
+Experiment for scheme 02: Iso-Direct-Indep + Topo-Face-Stratification
 """
 
 from __future__ import annotations
@@ -9,14 +9,14 @@ import numpy as np
 
 from music.midi.midi_entity import MIDIEntity
 from core.compilation.components.spinfoam import SpinfoamComplex
-from core.compilation.schemes.s_013_iso_direct_indep_geom_volume import IsoDirectIndepGeomVolume
+from core.compilation.schemes.s_002_iso_direct_indep_topo_face import IsoDirectIndepTopoFace
 
-SCHEME_TITLE = "Iso-Direct-Indep + Geom-VolumeOperator"
-SCHEME_IDX   = 13
+SCHEME_TITLE = "Iso-Direct-Indep + Topo-Face-Stratification"
+SCHEME_IDX   = 2
 
 
 def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
-    """Run experiment 13: Iso-Direct-Indep + Geom-VolumeOperator"""
+    """Run experiment 02: Iso-Direct-Indep + Topo-Face-Stratification"""
 
     if midi_path and os.path.exists(midi_path):
         midi = MIDIEntity.from_file(midi_path)
@@ -26,7 +26,7 @@ def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
             pr[pitch - 21, :] = 1.0
         midi = MIDIEntity.from_piano_roll(pr)
 
-    scheme = IsoDirectIndepGeomVolume()
+    scheme = IsoDirectIndepTopoFace()
     sf = scheme.compile_to_spinfoam(midi)
     return sf
 

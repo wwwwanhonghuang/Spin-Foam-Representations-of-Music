@@ -62,10 +62,10 @@ def write_compilation(idx, module, cls, title, t_class, t_desc):
 
 
 def write_experiment(idx, module, cls, title):
-    idx2 = f"{idx:02d}"
+    idx3 = f"{idx:03d}"
     lines = [
         f'"""',
-        f'exp_{idx2}_{module}.py',
+        f'exp_{idx3}_{module}.py',
         f'Experiment for scheme {idx:02d}: {title}',
         f'"""',
         f'',
@@ -102,14 +102,14 @@ def write_experiment(idx, module, cls, title):
         f'    path = sys.argv[1] if len(sys.argv) > 1 else None',
         f'    run(midi_path=path, verbose=True)',
     ]
-    path = f"experiments/exp_{idx2}_{module}.py"
+    path = f"experiments/exp_{idx3}_{module}.py"
     with open(path, "w") as fh:
         fh.write("\n".join(lines) + "\n")
     print(f"  {path}")
 
 
 if __name__ == "__main__":
-    os.makedirs("core/compilation/schemes", exist_ok=True)
+    os.makedirs("core/compilation/schems", exist_ok=True)
     os.makedirs("experiments", exist_ok=True)
 
     # Remove old prefixed files

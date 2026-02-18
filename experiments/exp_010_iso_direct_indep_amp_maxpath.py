@@ -1,6 +1,6 @@
 """
-exp_07_iso_direct_indep_thermo_shannon.py
-Experiment for scheme 07: Iso-Direct-Indep + Thermo-Entropy-Shannon
+exp_010_iso_direct_indep_amp_maxpath.py
+Experiment for scheme 10: Iso-Direct-Indep + Amp-MaxPath
 """
 
 from __future__ import annotations
@@ -9,14 +9,14 @@ import numpy as np
 
 from music.midi.midi_entity import MIDIEntity
 from core.compilation.components.spinfoam import SpinfoamComplex
-from core.compilation.schemes.s_007_iso_direct_indep_thermo_shannon import IsoDirectIndepThermoShannon
+from core.compilation.schemes.s_010_iso_direct_indep_amp_maxpath import IsoDirectIndepAmpMaxPath
 
-SCHEME_TITLE = "Iso-Direct-Indep + Thermo-Entropy-Shannon"
-SCHEME_IDX   = 7
+SCHEME_TITLE = "Iso-Direct-Indep + Amp-MaxPath"
+SCHEME_IDX   = 10
 
 
 def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
-    """Run experiment 07: Iso-Direct-Indep + Thermo-Entropy-Shannon"""
+    """Run experiment 10: Iso-Direct-Indep + Amp-MaxPath"""
 
     if midi_path and os.path.exists(midi_path):
         midi = MIDIEntity.from_file(midi_path)
@@ -26,7 +26,7 @@ def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
             pr[pitch - 21, :] = 1.0
         midi = MIDIEntity.from_piano_roll(pr)
 
-    scheme = IsoDirectIndepThermoShannon()
+    scheme = IsoDirectIndepAmpMaxPath()
     sf = scheme.compile_to_spinfoam(midi)
     return sf
 

@@ -1,6 +1,6 @@
 """
-exp_02_iso_direct_indep_topo_face.py
-Experiment for scheme 02: Iso-Direct-Indep + Topo-Face-Stratification
+exp_004_iso_direct_indep_causal_pure.py
+Experiment for scheme 04: Iso-Direct-Indep + Causal-PureOrder
 """
 
 from __future__ import annotations
@@ -9,14 +9,14 @@ import numpy as np
 
 from music.midi.midi_entity import MIDIEntity
 from core.compilation.components.spinfoam import SpinfoamComplex
-from core.compilation.schemes.s_002_iso_direct_indep_topo_face import IsoDirectIndepTopoFace
+from core.compilation.schemes.s_004_iso_direct_indep_causal_pure import IsoDirectIndepCausalPure
 
-SCHEME_TITLE = "Iso-Direct-Indep + Topo-Face-Stratification"
-SCHEME_IDX   = 2
+SCHEME_TITLE = "Iso-Direct-Indep + Causal-PureOrder"
+SCHEME_IDX   = 4
 
 
 def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
-    """Run experiment 02: Iso-Direct-Indep + Topo-Face-Stratification"""
+    """Run experiment 04: Iso-Direct-Indep + Causal-PureOrder"""
 
     if midi_path and os.path.exists(midi_path):
         midi = MIDIEntity.from_file(midi_path)
@@ -26,7 +26,7 @@ def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
             pr[pitch - 21, :] = 1.0
         midi = MIDIEntity.from_piano_roll(pr)
 
-    scheme = IsoDirectIndepTopoFace()
+    scheme = IsoDirectIndepCausalPure()
     sf = scheme.compile_to_spinfoam(midi)
     return sf
 

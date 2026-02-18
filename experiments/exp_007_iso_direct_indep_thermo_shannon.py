@@ -1,6 +1,6 @@
 """
-exp_05_iso_direct_indep_causal_sorkin.py
-Experiment for scheme 05: Iso-Direct-Indep + Causal-SorkinCount
+exp_007_iso_direct_indep_thermo_shannon.py
+Experiment for scheme 07: Iso-Direct-Indep + Thermo-Entropy-Shannon
 """
 
 from __future__ import annotations
@@ -9,14 +9,14 @@ import numpy as np
 
 from music.midi.midi_entity import MIDIEntity
 from core.compilation.components.spinfoam import SpinfoamComplex
-from core.compilation.schemes.s_005_iso_direct_indep_causal_sorkin import IsoDirectIndepCausalSorkin
+from core.compilation.schemes.s_007_iso_direct_indep_thermo_shannon import IsoDirectIndepThermoShannon
 
-SCHEME_TITLE = "Iso-Direct-Indep + Causal-SorkinCount"
-SCHEME_IDX   = 5
+SCHEME_TITLE = "Iso-Direct-Indep + Thermo-Entropy-Shannon"
+SCHEME_IDX   = 7
 
 
 def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
-    """Run experiment 05: Iso-Direct-Indep + Causal-SorkinCount"""
+    """Run experiment 07: Iso-Direct-Indep + Thermo-Entropy-Shannon"""
 
     if midi_path and os.path.exists(midi_path):
         midi = MIDIEntity.from_file(midi_path)
@@ -26,7 +26,7 @@ def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
             pr[pitch - 21, :] = 1.0
         midi = MIDIEntity.from_piano_roll(pr)
 
-    scheme = IsoDirectIndepCausalSorkin()
+    scheme = IsoDirectIndepThermoShannon()
     sf = scheme.compile_to_spinfoam(midi)
     return sf
 

@@ -1,140 +1,267 @@
-"""
-MIDIEntity: a structured representation of a MIDI file.
-Loadable from .mid files via pretty_midi.
-"""
-
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import List, Optional
 import numpy as np
-
-try:
-    import pretty_midi
-except ImportError:
-    pretty_midi = None
-
+import mido
+from typing import List, Optional, Dict
+from music.midi.utils import note_name
+from collections import defaultdict
 
 @dataclass
-class NoteEvent:
-    pitch: int          # 0–127 (piano: 21–108)
-    velocity: int       # 0–127
-    start: float        # seconds
-    end: float          # seconds
-
-    @property
-    def duration(self) -> float:
-        return self.end - self.start
-
+class MIDIEvent:
+    type: str           # 'note_on', 'note_off', 'control_change', 'tempo', 'time_sig'
+    time: float         # Absolute time in seconds
+    tick: int           # Absolute time in MIDI ticks (integer precision)
+    channel: int = 0
+    note: Optional[int] = None
+    velocity: Optional[int] = None
+    control: Optional[int] = None
+    value: Optional[int] = None
+    data: Optional[Dict] = None  # For Meta-events like tempo/time_signature
 
 @dataclass
 class MIDIEntity:
-    """
-    Unified representation of a MIDI file used across all compilation schemes.
-
-    Attributes:
-        notes        : list of NoteEvent (all instruments flattened)
-        tempo        : estimated tempo in BPM
-        duration     : total duration in seconds
-        piano_roll   : np.ndarray of shape (88, T) — binary activation matrix
-                       rows = piano keys 21..108, columns = time frames (10ms)
-        source_path  : original file path if loaded from disk
-    """
-    notes: List[NoteEvent] = field(default_factory=list)
-    tempo: float = 120.0
-    duration: float = 0.0
-    piano_roll: Optional[np.ndarray] = None   # shape (88, T)
     source_path: Optional[str] = None
+    ticks_per_beat: int = 480
+    
+    # 1. The Raw Event Stream (Chronological)
+    events: List[MIDIEvent] = field(default_factory=list)
+    
+    # 2. The Discrete State Sequence (sigma_sequence)
+    sigma_sequence: Optional[np.ndarray] = None 
+    
+    # 3. Temporal Metadata
+    event_times: np.ndarray = field(default_factory=lambda: np.array([]))  # Absolute seconds
+    delta_times: np.ndarray = field(default_factory=lambda: np.array([]))  # Interval between events
+
+    # 4. Tempo Map: list of {'time': float (seconds), 'bpm': float}
+    # Ordered chronologically. Captures all tempo changes in the file.
+    # Use bpm_at(t) to query BPM at any point in time.
+    tempo_map: List[Dict] = field(default_factory=list)
 
     @classmethod
-    def from_file(cls, path: str, fs: int = 100) -> MIDIEntity:
-        """
-        Load a MIDIEntity from a .mid file.
+    def from_file(cls, path: str) -> "MIDIEntity":
+        mid = mido.MidiFile(path)
+        ticks_per_beat = mid.ticks_per_beat
 
-        Args:
-            path : path to the .mid file
-            fs   : piano roll frame rate in Hz (default 100 = 10ms per frame)
-        """
-        if pretty_midi is None:
-            raise ImportError("pretty_midi is required: pip install pretty_midi")
+        raw_events: List[MIDIEvent] = []
 
-        pm = pretty_midi.PrettyMIDI(path)
+        # Structural time
+        current_time_sec = 0.0
+        current_tick = 0
 
-        notes = []
-        for instrument in pm.instruments:
-            if instrument.is_drum:
-                continue
-            for n in instrument.notes:
-                notes.append(NoteEvent(
-                    pitch=n.pitch,
-                    velocity=n.velocity,
-                    start=n.start,
-                    end=n.end,
-                ))
-        notes.sort(key=lambda n: n.start)
+        # Default tempo = 500000 microseconds per beat (120 BPM)
+        tempo = 500000
 
-        # Piano roll: rows = MIDI pitches 21..108 (88 keys), cols = frames
-        pr_full = pm.get_piano_roll(fs=fs)  # shape (128, T)
-        piano_roll = (pr_full[21:109] > 0).astype(np.float32)  # shape (88, T)
+        # Internal state for sigma tracking
+        active_state = np.zeros(128, dtype=np.float32)
+        snapshots = []
+        timestamps = []
 
-        tempo_arr, _ = pm.get_tempo_changes()
-        tempo = float(tempo_arr[0]) if len(tempo_arr) > 0 else 120.0
+        # Tempo map
+        tempo_map = [{'time': 0.0, 'bpm': 120.0}]
+
+        # IMPORTANT: iterate merged message stream
+        for msg in mid:
+
+            # ─────────────────────────────
+            # 1. Accumulate continuous time
+            # msg.time is delta time in seconds
+            # ─────────────────────────────
+            delta_sec = msg.time
+            current_time_sec += delta_sec
+
+            # ─────────────────────────────
+            # 2. Accumulate discrete ticks
+            # Convert seconds back to ticks using current tempo
+            # ─────────────────────────────
+            delta_tick = mido.second2tick(
+                delta_sec,
+                ticks_per_beat,
+                tempo
+            )
+            current_tick += int(round(delta_tick))
+
+            # ─────────────────────────────
+            # 3. Handle tempo changes
+            # ─────────────────────────────
+            if msg.type == 'set_tempo':
+                tempo = msg.tempo
+                bpm = mido.tempo2bpm(tempo)
+
+                tempo_map.append({
+                    'time': current_time_sec,
+                    'bpm': bpm
+                })
+
+            # ─────────────────────────────
+            # 4. Create event
+            # ─────────────────────────────
+            new_event = MIDIEvent(
+                type=msg.type,
+                time=current_time_sec,
+                tick=current_tick
+            )
+
+            state_changed = False
+
+            # ─────────────────────────────
+            # 5. Handle note events
+            # ─────────────────────────────
+            if msg.type == 'note_on':
+                new_event.note = msg.note
+                new_event.velocity = msg.velocity
+                new_event.channel = msg.channel
+
+                if msg.velocity > 0:
+                    active_state[msg.note] = msg.velocity
+                else:
+                    active_state[msg.note] = 0
+
+                state_changed = True
+
+            elif msg.type == 'note_off':
+                new_event.note = msg.note
+                new_event.velocity = 0
+                new_event.channel = msg.channel
+
+                active_state[msg.note] = 0
+                state_changed = True
+
+            elif msg.type == 'control_change':
+                new_event.control = msg.control
+                new_event.value = msg.value
+                new_event.channel = msg.channel
+
+            elif msg.type == 'time_signature':
+                new_event.data = {
+                    'numerator': msg.numerator,
+                    'denominator': msg.denominator,
+                }
+
+            raw_events.append(new_event)
+
+            # ─────────────────────────────
+            # 6. Snapshot sigma state
+            # ─────────────────────────────
+            if state_changed:
+                snapshots.append(active_state[21:109].copy())
+                timestamps.append(current_time_sec)
 
         return cls(
-            notes=notes,
-            tempo=tempo,
-            duration=pm.get_end_time(),
-            piano_roll=piano_roll,
             source_path=path,
+            ticks_per_beat=ticks_per_beat,
+            events=raw_events,
+            sigma_sequence=np.array(snapshots) if snapshots else np.empty((0, 128)),
+            event_times=np.array(timestamps),
+            delta_times=np.diff(timestamps, prepend=0.0),
+            tempo_map=tempo_map,
         )
 
-    @classmethod
-    def from_piano_roll(cls, piano_roll: np.ndarray, tempo: float = 120.0, fs: int = 100) -> MIDIEntity:
-        """
-        Construct a MIDIEntity directly from a (88, T) piano roll array.
-        """
-        assert piano_roll.shape[0] == 88, "piano_roll must have 88 rows (keys)"
-        notes = []
-        T = piano_roll.shape[1]
-        for key_idx in range(88):
-            pitch = key_idx + 21
-            active = False
-            start_frame = 0
-            for t in range(T):
-                if piano_roll[key_idx, t] > 0 and not active:
-                    active = True
-                    start_frame = t
-                elif piano_roll[key_idx, t] == 0 and active:
-                    active = False
-                    notes.append(NoteEvent(
-                        pitch=pitch,
-                        velocity=64,
-                        start=start_frame / fs,
-                        end=t / fs,
-                    ))
-            if active:
-                notes.append(NoteEvent(
-                    pitch=pitch,
-                    velocity=64,
-                    start=start_frame / fs,
-                    end=T / fs,
-                ))
-        notes.sort(key=lambda n: n.start)
-        return cls(
-            notes=notes,
-            tempo=tempo,
-            duration=T / fs,
-            piano_roll=piano_roll.astype(np.float32),
-        )
+    # ── BPM queries ──────────────────────────────────────────────────────────
 
-    def sigma(self, t: int) -> np.ndarray:
+    @property
+    def initial_bpm(self) -> float:
+        """BPM at the start of the file (t = 0)."""
+        return self.tempo_map[0]['bpm'] if self.tempo_map else 120.0
+
+    @property
+    def final_bpm(self) -> float:
+        """BPM at the last tempo change."""
+        return self.tempo_map[-1]['bpm'] if self.tempo_map else 120.0
+
+    @property
+    def is_constant_tempo(self) -> bool:
+        """True if the file has no tempo changes."""
+        return len(self.tempo_map) == 1
+
+    def bpm_at(self, time: float) -> float:
         """
-        Return the 88-dimensional activation vector σ at frame t.
+        Return the BPM in effect at the given absolute time (seconds).
+        Uses the last tempo change that occurred at or before `time`.
         """
-        if self.piano_roll is None:
-            raise ValueError("piano_roll not available")
-        return self.piano_roll[:, t]
+        bpm = self.tempo_map[0]['bpm']
+        for entry in self.tempo_map:
+            if entry['time'] <= time:
+                bpm = entry['bpm']
+            else:
+                break
+        return bpm
+
+    def bpm_sequence(self) -> np.ndarray:
+        """
+        Return a (N,) array of BPM values aligned to sigma_sequence.
+        One BPM value per state snapshot — useful as a feature in compilation schemes.
+        """
+        return np.array([self.bpm_at(t) for t in self.event_times])
+
+    # ── Repr ─────────────────────────────────────────────────────────────────
 
     def __repr__(self) -> str:
-        return (f"MIDIEntity(notes={len(self.notes)}, "
-                f"duration={self.duration:.2f}s, tempo={self.tempo:.1f}bpm, "
-                f"piano_roll={self.piano_roll.shape if self.piano_roll is not None else None})")
+        duration = self.event_times[-1] if len(self.event_times) > 0 else 0.0
+        bpm_info = (
+            f"bpm={self.initial_bpm:.1f}"
+            if self.is_constant_tempo
+            else f"bpm={self.initial_bpm:.1f}→{self.final_bpm:.1f} ({len(self.tempo_map)} changes)"
+        )
+        return (f"MIDIEntity(source={self.source_path}, "
+                f"events={len(self.events)}, "
+                f"states={len(self.sigma_sequence)}, "
+                f"duration={duration:.2f}s, "
+                f"{bpm_info})")
+        
+    def print_notes_by_tick(
+        self,
+        limit: int | None = None,
+        use_flats: bool = False,
+        include_note_off: bool = False
+    ) -> None:
+        """
+        Print notes grouped by tick.
+
+        Parameters
+        ----------
+        limit : int | None
+            Maximum number of tick lines to print.
+        use_flats : bool
+            Use flat note naming.
+        include_note_off : bool
+            If True, include note_off events.
+        """
+
+        tick_dict = defaultdict(list)
+        time_dict = {}
+
+        # ── Group events by tick ─────────────────────
+        for ev in self.events:
+            if ev.type == "note_on":
+                # velocity 0 note_on is semantically note_off
+                if ev.velocity is not None and ev.velocity > 0:
+                    tick_dict[ev.tick].append(ev.note)
+                    time_dict[ev.tick] = ev.time
+                elif include_note_off:
+                    tick_dict[ev.tick].append(ev.note)
+                    time_dict[ev.tick] = ev.time
+
+            elif include_note_off and ev.type == "note_off":
+                tick_dict[ev.tick].append(ev.note)
+                time_dict[ev.tick] = ev.time
+
+        # ── Sort ticks chronologically ───────────────
+        sorted_ticks = sorted(tick_dict.keys())
+
+        count = 0
+        for tick in sorted_ticks:
+            notes = tick_dict[tick]
+
+            if not notes:
+                continue
+
+            names = [note_name(n, use_flats=use_flats) for n in notes]
+            notes_str = " ".join(names)
+
+            print(f"Tick {tick:07d} | t={time_dict[tick]:8.3f}s | {notes_str}")
+
+            count += 1
+            if limit is not None and count >= limit:
+                print("... (truncated)")
+                break

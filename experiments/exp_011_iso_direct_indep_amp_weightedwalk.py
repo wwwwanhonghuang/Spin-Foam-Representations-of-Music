@@ -1,6 +1,6 @@
 """
-exp_14_iso_direct_indep_geom_geodesic.py
-Experiment for scheme 14: Iso-Direct-Indep + Geom-GeodesicDistance
+exp_011_iso_direct_indep_amp_weightedwalk.py
+Experiment for scheme 11: Iso-Direct-Indep + Amp-WeightedWalk
 """
 
 from __future__ import annotations
@@ -9,14 +9,14 @@ import numpy as np
 
 from music.midi.midi_entity import MIDIEntity
 from core.compilation.components.spinfoam import SpinfoamComplex
-from core.compilation.schemes.s_014_iso_direct_indep_geom_geodesic import IsoDirectIndepGeomGeodesic
+from core.compilation.schemes.s_011_iso_direct_indep_amp_weightedwalk import IsoDirectIndepAmpWeightedWalk
 
-SCHEME_TITLE = "Iso-Direct-Indep + Geom-GeodesicDistance"
-SCHEME_IDX   = 14
+SCHEME_TITLE = "Iso-Direct-Indep + Amp-WeightedWalk"
+SCHEME_IDX   = 11
 
 
 def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
-    """Run experiment 14: Iso-Direct-Indep + Geom-GeodesicDistance"""
+    """Run experiment 11: Iso-Direct-Indep + Amp-WeightedWalk"""
 
     if midi_path and os.path.exists(midi_path):
         midi = MIDIEntity.from_file(midi_path)
@@ -26,7 +26,7 @@ def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
             pr[pitch - 21, :] = 1.0
         midi = MIDIEntity.from_piano_roll(pr)
 
-    scheme = IsoDirectIndepGeomGeodesic()
+    scheme = IsoDirectIndepAmpWeightedWalk()
     sf = scheme.compile_to_spinfoam(midi)
     return sf
 

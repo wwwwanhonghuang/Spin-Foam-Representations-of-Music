@@ -1,6 +1,6 @@
 """
-exp_03_iso_direct_indep_topo_homological.py
-Experiment for scheme 03: Iso-Direct-Indep + Topo-Homological
+exp_014_iso_direct_indep_geom_geodesic.py
+Experiment for scheme 14: Iso-Direct-Indep + Geom-GeodesicDistance
 """
 
 from __future__ import annotations
@@ -9,14 +9,14 @@ import numpy as np
 
 from music.midi.midi_entity import MIDIEntity
 from core.compilation.components.spinfoam import SpinfoamComplex
-from core.compilation.schemes.s_003_iso_direct_indep_topo_homological import IsoDirectIndepTopoHomological
+from core.compilation.schemes.s_014_iso_direct_indep_geom_geodesic import IsoDirectIndepGeomGeodesic
 
-SCHEME_TITLE = "Iso-Direct-Indep + Topo-Homological"
-SCHEME_IDX   = 3
+SCHEME_TITLE = "Iso-Direct-Indep + Geom-GeodesicDistance"
+SCHEME_IDX   = 14
 
 
 def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
-    """Run experiment 03: Iso-Direct-Indep + Topo-Homological"""
+    """Run experiment 14: Iso-Direct-Indep + Geom-GeodesicDistance"""
 
     if midi_path and os.path.exists(midi_path):
         midi = MIDIEntity.from_file(midi_path)
@@ -26,7 +26,7 @@ def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
             pr[pitch - 21, :] = 1.0
         midi = MIDIEntity.from_piano_roll(pr)
 
-    scheme = IsoDirectIndepTopoHomological()
+    scheme = IsoDirectIndepGeomGeodesic()
     sf = scheme.compile_to_spinfoam(midi)
     return sf
 

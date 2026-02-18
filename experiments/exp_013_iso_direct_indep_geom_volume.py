@@ -1,6 +1,6 @@
 """
-exp_12_iso_direct_indep_geom_area.py
-Experiment for scheme 12: Iso-Direct-Indep + Geom-AreaOperator
+exp_013_iso_direct_indep_geom_volume.py
+Experiment for scheme 13: Iso-Direct-Indep + Geom-VolumeOperator
 """
 
 from __future__ import annotations
@@ -9,14 +9,14 @@ import numpy as np
 
 from music.midi.midi_entity import MIDIEntity
 from core.compilation.components.spinfoam import SpinfoamComplex
-from core.compilation.schemes.s_012_iso_direct_indep_geom_area import IsoDirectIndepGeomArea
+from core.compilation.schemes.s_013_iso_direct_indep_geom_volume import IsoDirectIndepGeomVolume
 
-SCHEME_TITLE = "Iso-Direct-Indep + Geom-AreaOperator"
-SCHEME_IDX   = 12
+SCHEME_TITLE = "Iso-Direct-Indep + Geom-VolumeOperator"
+SCHEME_IDX   = 13
 
 
 def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
-    """Run experiment 12: Iso-Direct-Indep + Geom-AreaOperator"""
+    """Run experiment 13: Iso-Direct-Indep + Geom-VolumeOperator"""
 
     if midi_path and os.path.exists(midi_path):
         midi = MIDIEntity.from_file(midi_path)
@@ -26,7 +26,7 @@ def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
             pr[pitch - 21, :] = 1.0
         midi = MIDIEntity.from_piano_roll(pr)
 
-    scheme = IsoDirectIndepGeomArea()
+    scheme = IsoDirectIndepGeomVolume()
     sf = scheme.compile_to_spinfoam(midi)
     return sf
 

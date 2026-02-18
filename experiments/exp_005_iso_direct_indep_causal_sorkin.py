@@ -1,6 +1,6 @@
 """
-exp_10_iso_direct_indep_amp_maxpath.py
-Experiment for scheme 10: Iso-Direct-Indep + Amp-MaxPath
+exp_005_iso_direct_indep_causal_sorkin.py
+Experiment for scheme 05: Iso-Direct-Indep + Causal-SorkinCount
 """
 
 from __future__ import annotations
@@ -9,14 +9,14 @@ import numpy as np
 
 from music.midi.midi_entity import MIDIEntity
 from core.compilation.components.spinfoam import SpinfoamComplex
-from core.compilation.schemes.s_010_iso_direct_indep_amp_maxpath import IsoDirectIndepAmpMaxPath
+from core.compilation.schemes.s_005_iso_direct_indep_causal_sorkin import IsoDirectIndepCausalSorkin
 
-SCHEME_TITLE = "Iso-Direct-Indep + Amp-MaxPath"
-SCHEME_IDX   = 10
+SCHEME_TITLE = "Iso-Direct-Indep + Causal-SorkinCount"
+SCHEME_IDX   = 5
 
 
 def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
-    """Run experiment 10: Iso-Direct-Indep + Amp-MaxPath"""
+    """Run experiment 05: Iso-Direct-Indep + Causal-SorkinCount"""
 
     if midi_path and os.path.exists(midi_path):
         midi = MIDIEntity.from_file(midi_path)
@@ -26,7 +26,7 @@ def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
             pr[pitch - 21, :] = 1.0
         midi = MIDIEntity.from_piano_roll(pr)
 
-    scheme = IsoDirectIndepAmpMaxPath()
+    scheme = IsoDirectIndepCausalSorkin()
     sf = scheme.compile_to_spinfoam(midi)
     return sf
 

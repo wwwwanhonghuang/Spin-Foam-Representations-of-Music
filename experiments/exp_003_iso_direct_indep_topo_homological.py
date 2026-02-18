@@ -1,6 +1,6 @@
 """
-exp_01_iso_direct_indep_topo_vertex.py
-Experiment for scheme 01: Iso-Direct-Indep + Topo-Vertex-PartialOrder
+exp_003_iso_direct_indep_topo_homological.py
+Experiment for scheme 03: Iso-Direct-Indep + Topo-Homological
 """
 
 from __future__ import annotations
@@ -9,14 +9,14 @@ import numpy as np
 
 from music.midi.midi_entity import MIDIEntity
 from core.compilation.components.spinfoam import SpinfoamComplex
-from core.compilation.schemes.s_001_iso_direct_indep_topo_vertex import IsoDirectIndepTopoVertex
+from core.compilation.schemes.s_003_iso_direct_indep_topo_homological import IsoDirectIndepTopoHomological
 
-SCHEME_TITLE = "Iso-Direct-Indep + Topo-Vertex-PartialOrder"
-SCHEME_IDX   = 1
+SCHEME_TITLE = "Iso-Direct-Indep + Topo-Homological"
+SCHEME_IDX   = 3
 
 
 def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
-    """Run experiment 01: Iso-Direct-Indep + Topo-Vertex-PartialOrder"""
+    """Run experiment 03: Iso-Direct-Indep + Topo-Homological"""
 
     if midi_path and os.path.exists(midi_path):
         midi = MIDIEntity.from_file(midi_path)
@@ -26,7 +26,7 @@ def run(midi_path: str = None, verbose: bool = True) -> SpinfoamComplex:
             pr[pitch - 21, :] = 1.0
         midi = MIDIEntity.from_piano_roll(pr)
 
-    scheme = IsoDirectIndepTopoVertex()
+    scheme = IsoDirectIndepTopoHomological()
     sf = scheme.compile_to_spinfoam(midi)
     return sf
 
