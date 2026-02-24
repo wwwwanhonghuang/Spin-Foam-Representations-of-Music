@@ -240,3 +240,9 @@ class IsoDirectIndepTopoVertex(CompilationScheme):
             if v.id == v_id:
                 v.edge_ids = v.edge_ids + (e_id,)
                 break
+            
+            
+# encoding method:
+# j=5.5, specific note in a musical scale encode in amplitude
+# pitch directly encode in amplitude
+# 128 faces carry j = 1/2 spin, which each face represent a note, m=1/2 when on, while m=-1/2 when off.
