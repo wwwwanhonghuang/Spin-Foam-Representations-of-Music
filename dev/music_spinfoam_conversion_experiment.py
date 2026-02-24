@@ -1,36 +1,3 @@
-"""
-music_gft_v11.py
-================
-Unified GFT-grounded Music Spin Foam.  Merges v9 + v10.
-
-Bug fixes vs earlier drafts
-────────────────────────────
-  CRASH   P_min 0.04→0.10  (2^30→2^10 states)
-  T7      ∂₁∘∂₂=0 replaced by correct structural test:
-          worldsheets are open cylinders, not closed surfaces;
-          correct invariant = edges form connected path v_{t_from}→v_{t_to}
-  T10     TM build O(S²) bottleneck fixed with lru_cache + bulk-only vocab
-
-Fixes vs real-MIDI analysis (v11.1)
-────────────────────────────────────
-  FIX A   A_v was 0 for most real chords (strict J=0 projection).
-          Replaced with Gaussian: A_v = λ·exp(−J_min/σ_J)
-            J_min = min admissible total spin from coupling j1⊗...⊗jk
-            σ_J   = "harmonic temperature" (new GFTParams field, default 1.0)
-            • Always positive — Z_single and Z are never 0 by construction.
-            • J_min=0 → A_v=λ (maximal, closed chord, matches old formula).
-            • Limit σ_J→0: recovers strict formula.
-            • Limit σ_J→∞: all chords equal (no harmonic preference).
-          New test T4b verifies A_v>0 for non-closing chord.
-
-  FIX B   Z was computed with T=min(T,4) — ignored 784/788 beats.
-          Now uses full T. Efficient implementation:
-            • TM built once: O(S²), S=1024, ~1s (lru_cache on A_v).
-            • Forward DP: T numpy matrix-vector products — fast.
-            • Marginals: sparse storage (first/last MARG_CAP steps).
-            • Beam search: O(T·top_k·S), stores head+tail for display.
-          New argparse flag: --sigma_J (harmonic temperature).
-"""
 
 from __future__ import annotations
 from dataclasses import dataclass, field
@@ -356,7 +323,178 @@ class SpinFoam2Complex:
                 lines.append(f"    v{v.vid}  t={v.t}  A_v={v.amplitude:.6f}")
         lines.append("="*68)
         return "\n".join(lines)
+    def to_dict(self) -> dict:
+        """
+        Serialise the 2-complex to a plain Python dict (JSON-serialisable).
 
+        Schema (version 1)
+        ------------------
+        {
+          "version":  1,
+          "params":   {mu2, lam, P_min, sigma_J},
+          "vertices": { str(vid): {vid, t, amplitude, edge_ids} },
+          "edges":    { str(eid): {eid, kind, t, face_ids,
+                                   v_src_id, v_tgt_id, intertwiner} },
+          "faces":    { str(fid): {fid, j, q, propagator_weight,
+                                   t_from, t_to, edge_ids} }
+        }
+
+        • All values are JSON-native (float, int, list, str, None).
+        • numpy arrays (Intertwiner.components) are stored as nested lists.
+        • Enums are stored as their .name string.
+        • Half-integer spins (e.g. 2.5) round-trip exactly through JSON.
+
+        Round-trip guarantee
+        --------------------
+            foam2 = SpinFoam2Complex.from_dict(foam.to_dict())
+            assert foam2.to_dict() == foam.to_dict()
+        """
+        import json as _json
+
+        def _iota(iota: Intertwiner) -> dict:
+            return {
+                "face_spins":  iota.face_spins,
+                "components":  iota.components.tolist()
+                               if iota.components is not None else None,
+                "dim_inv":     iota.dim_inv,
+                "norm":        iota.norm,
+            }
+
+        return {
+            "version": 1,
+            "params": {
+                "mu2":     self.params.mu2,
+                "lam":     self.params.lam,
+                "P_min":   self.params.P_min,
+                "sigma_J": self.params.sigma_J,
+            },
+            "vertices": {
+                str(vid): {
+                    "vid":       v.vid,
+                    "t":         v.t,
+                    "amplitude": v.amplitude,
+                    "edge_ids":  v.edge_ids,
+                }
+                for vid, v in self.vertices.items()
+            },
+            "edges": {
+                str(eid): {
+                    "eid":         e.eid,
+                    "kind":        e.kind.name,   # "TIME" | "INSTANTONIC"
+                    "t":           e.t,
+                    "face_ids":    e.face_ids,
+                    "v_src_id":    e.v_src_id,
+                    "v_tgt_id":    e.v_tgt_id,
+                    "intertwiner": _iota(e.intertwiner),
+                }
+                for eid, e in self.edges.items()
+            },
+            "faces": {
+                str(fid): {
+                    "fid":               f.fid,
+                    "j":                 f.j,
+                    "q":                 f.q,
+                    "propagator_weight": f.propagator_weight,
+                    "t_from":            f.t_from,
+                    "t_to":              f.t_to,
+                    "edge_ids":          f.edge_ids,
+                }
+                for fid, f in self.faces.items()
+            },
+        }
+
+    def to_json(self, path: str, indent: int = 2) -> None:
+        """
+        Write the 2-complex to *path* as a UTF-8 JSON file.
+
+        Usage
+        -----
+            foam.to_json("piece.json")
+            foam2 = SpinFoam2Complex.from_json("piece.json")
+        """
+        import json as _json
+        with open(path, "w", encoding="utf-8") as fh:
+            _json.dump(self.to_dict(), fh, indent=indent, ensure_ascii=False)
+        print(f"  Saved → {path}  "
+              f"({len(self.vertices)}V  {len(self.edges)}E  "
+              f"{len(self.faces)}F)")
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "SpinFoam2Complex":
+        """
+        Reconstruct a SpinFoam2Complex from the dict produced by to_dict().
+
+        Raises ValueError on unsupported format version.
+        """
+        version = d.get("version", 1)
+        if version != 1:
+            raise ValueError(f"Unsupported serialization version: {version}")
+
+        p = d["params"]
+        foam = cls(params=GFTParams(
+            mu2     = p["mu2"],
+            lam     = p["lam"],
+            P_min   = p["P_min"],
+            sigma_J = p["sigma_J"],
+        ))
+
+        for vid_str, v in d["vertices"].items():
+            foam.vertices[int(vid_str)] = SFVertex(
+                vid       = v["vid"],
+                t         = v["t"],
+                amplitude = v["amplitude"],
+                edge_ids  = v["edge_ids"],
+            )
+
+        for eid_str, e in d["edges"].items():
+            raw = e["intertwiner"]
+            comp = np.array(raw["components"]) \
+                   if raw["components"] is not None else None
+            foam.edges[int(eid_str)] = SFEdge(
+                eid         = e["eid"],
+                kind        = EdgeKind[e["kind"]],
+                t           = e["t"],
+                face_ids    = e["face_ids"],
+                v_src_id    = e["v_src_id"],
+                v_tgt_id    = e["v_tgt_id"],
+                intertwiner = Intertwiner(
+                    face_spins = raw["face_spins"],
+                    components = comp,
+                    dim_inv    = raw["dim_inv"],
+                    norm       = raw["norm"],
+                ),
+            )
+
+        for fid_str, f in d["faces"].items():
+            foam.faces[int(fid_str)] = SFace(
+                fid               = f["fid"],
+                j                 = f["j"],
+                q                 = f["q"],
+                propagator_weight = f["propagator_weight"],
+                t_from            = f["t_from"],
+                t_to              = f["t_to"],
+                edge_ids          = f["edge_ids"],
+            )
+
+        return foam
+
+    @classmethod
+    def from_json(cls, path: str) -> "SpinFoam2Complex":
+        """
+        Load a SpinFoam2Complex from a JSON file written by to_json().
+
+        Usage
+        -----
+            foam = SpinFoam2Complex.from_json("piece.json")
+        """
+        import json as _json
+        with open(path, "r", encoding="utf-8") as fh:
+            d = _json.load(fh)
+        foam = cls.from_dict(d)
+        print(f"  Loaded ← {path}  "
+              f"({len(foam.vertices)}V  {len(foam.edges)}E  "
+              f"{len(foam.faces)}F)")
+        return foam
 
 # ─────────────────────────────────────────────────────────────
 # §4.  Step 1: σ → FeynmanDiagram
@@ -1404,6 +1542,9 @@ Examples
                    help="Skip figure generation")
     p.add_argument("--no_partition", action="store_true",
                    help="Skip partition function Z (fast mode)")
+    p.add_argument("--serialize_spinfoam", action="store_true",
+                   help="Serialize SpinFoam")
+    
     return p
 
 
@@ -1471,6 +1612,11 @@ def main_cli(argv=None):
         out_path = base + "_decoded.mid"
 
     save_midi(sigma_recon, out_path, bpm=bpm_out)
+    if args.serialize_spinfoam:
+        base = os.path.splitext(args.midi_in)[0]
+        serialization_out_path = base + "_spinfoam.json"
+        foam.to_json(serialization_out_path)
+        
 
     # ── Partition function ────────────────────────────────────
     if not args.no_partition:
